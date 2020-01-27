@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 866 182">
+  <style>
+    rect { stroke:#000; stroke-width:2px; }
+    text { font-family:sans-serif; font-size:18px; }
+    .l1 { fill:#fc9; }
+    .l2 { fill:#cf6; }
+    .l3 { fill:#ccf; }
+  </style>
+  <rect x="191" y="141" width="50" height="40" class="l3"/>
+  <text x="210px" y="168px">C</text>
+  <rect x="41" y="141" width="150" height="40" class="l2"/>
+  <text x="110px" y="168px">B</text>
+  <rect x="41" y="101" width="120" height="40" class="l2"/>
+  <text x="95px" y="128px">D</text>
+  <rect x="1" y="101" width="40" height="40" class="l1"/>
+  <text x="15px" y="128px">A</text>
+
+  <rect x="271" y="41" width="50" height="40" class="l3"/>
+  <text x="290px" y="68px">C</text>
+  <rect x="121" y="41" width="150" height="40" class="l2"/>
+  <text x="190px" y="68px">B</text>
+  <rect x="1" y="41" width="120" height="40" class="l1"/>
+  <text x="55px" y="68px">D</text>
+  <rect x="1" y="1" width="40" height="40" class="l1"/>
+  <text x="15px" y="28px">A</text>
+</svg>
