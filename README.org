@@ -9,8 +9,8 @@
 Layer-based scheduling algorithm for parallel tasks with dependencies. \\
 Determines which tasks can be executed in parallel, by evaluating dependencies.
 
-/The code is a JavaScript rewrite of [[https://github.com/quipo/dependencysolver][quipo/dependencysolver]] and the introduction
-is taken from its [[https://github.com/quipo/dependencysolver/blob/2b009cb4ddcc2d0c564450ff99dcdc7c8959f79d/README.md][README.md]]./
+/The code is a JavaScript rewrite of [[https://github.com/quipo/dependencysolver][quipo/dependencysolver]] that starts
+dependencies as late as possible. The introduction is taken from its [[https://github.com/quipo/dependencysolver/blob/2b009cb4ddcc2d0c564450ff99dcdc7c8959f79d/README.md][README.md]]./
 
 * Introduction
 
@@ -130,8 +130,16 @@ Produces one layer per entry since they are interdependent and can't run in para
 [ [ 'A' ], [ 'B' ], [ 'C' ], [ 'D' ] ]
 #+end_src
 
-** As soon as possible
-Entries are scheduled to start as soon as possible, which is not always ideal.
+** As late as possible
+Entries are scheduled to start /as late as possible/ since it's equal or faster
+than starting /as soon as possible/.
+
+*As late as possible*
+[[./alap.svg]]
+
+*As soon as possible*
+[[./asap.svg]]
+
 #+name: example-5
 #+begin_src js
   [
@@ -147,20 +155,15 @@ Entries are scheduled to start as soon as possible, which is not always ideal.
   const entries =
   <<example-5>>
   <<test>>
-  tlog([ [ 'A', 'D' ], [ 'B' ], [ 'C' ] ]);
+  tlog([ [ 'A' ], [ 'B', 'D' ], [ 'C' ] ]);
 #+end_src
 
 Produces:
 
 #+RESULTS: run-example-5
 #+begin_src js
-[ [ 'A', 'D' ], [ 'B' ], [ 'C' ] ]
+[ [ 'A' ], [ 'B', 'D' ], [ 'C' ] ]
 #+end_src
-
-If ~D~ takes longer than ~A~ it will delay ~B~ unnecessarily since it's not
-needed until ~C~. It'd be better if ~D~ was in the 2nd layer.
-
-[[./asap-alap.svg]]
 
 ** Circular dependencies
 #+name: example-6
@@ -206,15 +209,15 @@ Circular dependencies produce no results
 
 #+name: run-example-4
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
-  <<example-4>>
-  <<test>>
-  tlog([
-    [ 'A', 'E', 'K' ],
-    [ 'B', 'H', 'I', 'J' ],
-    [ 'D', 'G' ],
-    [ 'C', 'F' ]
-  ]);
+    const entries =
+    <<example-4>>
+    <<test>>
+    tlog([
+      [ 'A', 'K' ],
+      [ 'B', 'E', 'H', 'I', 'J' ],
+      [ 'D', 'G' ],
+      [ 'C', 'F' ]
+    ]);
 #+end_src
 
 Produces:
@@ -222,8 +225,8 @@ Produces:
 #+RESULTS: run-example-4
 #+begin_src js
 [
-  [ 'A', 'E', 'K' ],
-  [ 'B', 'H', 'I', 'J' ],
+  [ 'A', 'K' ],
+  [ 'B', 'E', 'H', 'I', 'J' ],
   [ 'D', 'G' ],
   [ 'C', 'F' ]
 ]
@@ -232,6 +235,8 @@ Produces:
 * Code
 #+name: layeredTopologicalSort
 #+begin_src js
+  /** @typedef {[string, string[]]} Entry */
+
   /**
    ,* LayeredTopologicalSort returns a list of layers of entries, the entries
    ,* within each layer can be executed in parallel.
@@ -249,6 +254,7 @@ Produces:
     for (const entry of entries) {
       const entryId = entry[0];
       dependenciesToFrom[entryId] = Object.create(null);
+      if (!dependenciesFromTo[entryId]) dependenciesFromTo[entryId] = Object.create(null);
       const entryDeps = entry[1];
       for (const entryDep of entryDeps) {
         dependenciesToFrom[entryId][entryDep] = true;
@@ -260,12 +266,12 @@ Produces:
     /** @type {string[][]} */
     const layers = [];
 
-    while (0 < Object.keys(dependenciesToFrom).length) {
+    while (0 < Object.keys(dependenciesFromTo).length) {
       /** @type {string[]} */
       const thisIterationIds = [];
 
-      for (const k in dependenciesToFrom) {
-        const v = dependenciesToFrom[k];
+      for (const k in dependenciesFromTo) {
+        const v = dependenciesFromTo[k];
 
         // If an item has zero dependencies, remove it
         if (Object.keys(v).length === 0) thisIterationIds.push(k);
@@ -281,25 +287,24 @@ Produces:
         layer.push(id);
 
         // Remove the found items from the dictionary
-        delete dependenciesToFrom[id];
+        delete dependenciesFromTo[id];
 
         // Remove all outbound edges
-        if (dependenciesFromTo[id]) {
-          for (const dep in dependenciesFromTo[id]) {
-            delete dependenciesToFrom[dep][id];
+        if (dependenciesToFrom[id]) {
+          for (const dep in dependenciesToFrom[id]) {
+            delete dependenciesFromTo[dep][id];
           }
         }
       }
       layers.push(layer);
     }
+    layers.reverse();
     return layers;
   }
 #+end_src
 
 #+name: extra
 #+begin_src js
-  /** @typedef {[string, string[]]} Entry */
-
   /**
    ,* Returns false if there are no cycles in the dependency graph.
    ,*
@@ -307,28 +312,22 @@ Produces:
    ,* @ret {boolean}
    ,*/
   function hasCircularDependency(entries) {
-    return layeredTopologicalSort(entries).length <= 0;
+    return layeredTopologicalSort(entries).length < 1;
   }
 #+end_src
 
-#+name: main
-#+begin_src js :noweb yes :exports none
-  <<extra>>
-  <<layeredTopologicalSort>>
-#+end_src
-
 #+begin_src js :noweb yes :tangle layeredTopologicalSort.js :exports none
-  <<main>>
+  <<layeredTopologicalSort>>
+  <<extra>>
   export {
     layeredTopologicalSort,
     hasCircularDependency,
-    createEntry,
   };
 #+end_src
 
 #+name: test
 #+begin_src js :noweb yes :exports none
-  ; <<main>>
+  ; <<layeredTopologicalSort>>
   function tlog(expected) {
     const result = layeredTopologicalSort(entries);
     console.log(result);
