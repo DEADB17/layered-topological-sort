@@ -6,20 +6,22 @@
 #+exclude_tags: noexport
 #+creator: Emacs 27.0.50 (Org mode 9.3.1)
 
-Layer-based scheduling algorithm for parallel tasks with dependencies. \\
-Determines which tasks can be executed in parallel, by evaluating dependencies.
+Layer-based scheduling algorithm for parallel tasks with dependencies.
 
-/The code is a JavaScript rewrite of [[https://github.com/quipo/dependencysolver][quipo/dependencysolver]] that starts
-dependencies as late as possible. The introduction is taken from its [[https://github.com/quipo/dependencysolver/blob/2b009cb4ddcc2d0c564450ff99dcdc7c8959f79d/README.md][README.md]]./
+Determines which tasks can be executed in parallel, by evaluating dependencies
+and scheduling them to start /as soon as possible/ or /as late as possible/.
+
+/Acknowledgement: The code is based on [[https://github.com/quipo/dependencysolver][quipo/dependencysolver]] and the
+introduction is taken from its [[https://github.com/quipo/dependencysolver/blob/2b009cb4ddcc2d0c564450ff99dcdc7c8959f79d/README.md][README.md]]./
 
 * Introduction
 
-Given a list of entries (each with its own dependency list), it can sort them in
-layers of execution, where all entries in the same layer can be executed in
-parallel, and have no other dependency than the previous layer.
+Given a list of entries (each task with its own dependency list), it can sort
+them in layers of execution, where all task in the same layer can be executed
+in parallel, and have no other dependency than the previous layer.
 
-For instance, given entries ~A~, ~B~, ~C~, ~D~, where ~B~ and ~C~ depend on ~A~,
-and ~D~ depends on ~B~ and ~C~, this function will return three layers of
+For instance, given the tasks ~A~, ~B~, ~C~, ~D~, where ~B~ and ~C~ depend on
+~A~, and ~D~ depends on ~B~ and ~C~, this function will return three layers of
 execution (as ~B~ and ~C~ can be executed in parallel after ~A~ completes):
 
 *Dependency tree*
@@ -37,12 +39,12 @@ execution (as ~B~ and ~C~ can be executed in parallel after ~A~ completes):
 | Layer 3 | D    |
 
 ** JavaScript representation
-- A *task* is represented by a string.
-- An *entry* is a two element array:
+- A *Task* is represented by a string.
+- An *Entry* is a two element array:
   1. A *Task*.
-  2. An array of tasks representing the *dependencies*.
+  2. An array of tasks representing the *Dependencies*.
 - Entries are grouped into an array.
-#+name: example-1
+#+name: intro-example
 #+begin_src js
   [
     ['A', []],
@@ -54,7 +56,7 @@ execution (as ~B~ and ~C~ can be executed in parallel after ~A~ completes):
 
 Running
 #+begin_src js
-  layeredTopologicalSort([
+  asap([
     ['A', []],
     ['B', ['A']],
     ['C', ['A']],
@@ -62,24 +64,79 @@ Running
   ]);
 #+end_src
 
-#+name: run-example-1
+#+name: run-intro-example
 #+begin_src js :noweb yes :results output :exports results :wrap src js
   const entries =
-  <<example-1>>
+  <<intro-example>>
   <<test>>
-  tlog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ])
+  asaplog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ])
 #+end_src
 
 Produces an array of layers, where each layer is an array of tasks.
 
-#+RESULTS: run-example-1
+#+RESULTS: run-intro-example
 #+begin_src js
 [ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]
 #+end_src
 
+** As soon or as late as possible
+Entries are scheduled to start either /as soon as possible/ (=asap=) or /as late
+as possible/ (=alap=). Depending on the duration and order of tasks each can
+produce a shorter schedule.
+
+#+name: asap-alap-example
+#+begin_src js
+  [
+    ['A', []],
+    ['B', []],
+    ['C', ['A']],
+    ['D', ['B', 'C']],
+  ]
+#+end_src
+
+#+name: run-alap-example
+#+begin_src js :noweb yes :results output :exports results :wrap src js
+  const entries =
+  <<asap-alap-example>>
+  <<test>>
+  alaplog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]);
+#+end_src
+
+=alap= produces:
+
+#+RESULTS: run-alap-example
+#+begin_src js
+[ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]
+#+end_src
+
+#+name: run-asap-example
+#+begin_src js :noweb yes :results output :exports results :wrap src js
+  const entries =
+  <<asap-alap-example>>
+  <<test>>
+  asaplog([ [ 'A', 'B' ], [ 'C' ], [ 'D' ] ]);
+#+end_src
+
+=asap= produces:
+
+#+RESULTS: run-asap-example
+#+begin_src js
+[ [ 'A', 'B' ], [ 'C' ], [ 'D' ] ]
+#+end_src
+
+*** =alap= is better than =asap=
+alap [[./images/alap-win.svg]]
+
+asap [[./images/asap-lose.svg]]
+
+*** =asap= is better than =alap=
+asap [[./images/asap-win.svg]]
+
+alap [[./images/alap-lose.svg]]
+
 * Examples
 ** No dependencies
-#+name: example-2
+#+name: no-deps
 #+begin_src js
   [
     ['A', []],
@@ -89,23 +146,22 @@ Produces an array of layers, where each layer is an array of tasks.
   ]
 #+end_src
 
-#+name: run-example-2
+#+name: run-no-deps
 #+begin_src js :noweb yes :results output :exports results :wrap src js
   const entries =
-  <<example-2>>
+  <<no-deps>>
   <<test>>
-  tlog([ [ 'A', 'B', 'C', 'D' ] ]);
+  asaplog([ [ 'A', 'B', 'C', 'D' ] ]);
 #+end_src
 
-Produces a single layer, since all tasks are independent:
+Both =asap= and =alap= produce a single layer, since all tasks are independent:
 
-#+RESULTS: run-example-2
+#+RESULTS: run-no-deps
 #+begin_src js
 [ [ 'A', 'B', 'C', 'D' ] ]
 #+end_src
-
 ** Interdependent
-#+name: example-3
+#+name: inter-dep
 #+begin_src js
   [
     ['A', []],
@@ -115,58 +171,23 @@ Produces a single layer, since all tasks are independent:
   ]
 #+end_src
 
-#+name: run-example-3
+#+name: run-inter-dep
 #+begin_src js :noweb yes :results output :exports results :wrap src js
   const entries =
-  <<example-3>>
+  <<inter-dep>>
   <<test>>
-  tlog([ [ 'A' ], [ 'B' ], [ 'C' ], [ 'D' ] ]);
+  asaplog([ [ 'A' ], [ 'B' ], [ 'C' ], [ 'D' ] ]);
 #+end_src
 
-Produces one layer per entry since they are interdependent and can't run in parallel:
+Both =asap= and =alap= produce one layer per task since they are interdependent
+and can't run in parallel:
 
-#+RESULTS: run-example-3
+#+RESULTS: run-inter-dep
 #+begin_src js
 [ [ 'A' ], [ 'B' ], [ 'C' ], [ 'D' ] ]
 #+end_src
-
-** As late as possible
-Entries are scheduled to start /as late as possible/ since it's equal or faster
-than starting /as soon as possible/.
-
-*As late as possible*
-[[./alap.svg]]
-
-*As soon as possible*
-[[./asap.svg]]
-
-#+name: example-5
-#+begin_src js
-  [
-    ['A', []],
-    ['B', ['A']],
-    ['C', ['B', 'D']],
-    ['D', []],
-  ]
-#+end_src
-
-#+name: run-example-5
-#+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
-  <<example-5>>
-  <<test>>
-  tlog([ [ 'A' ], [ 'B', 'D' ], [ 'C' ] ]);
-#+end_src
-
-Produces:
-
-#+RESULTS: run-example-5
-#+begin_src js
-[ [ 'A' ], [ 'B', 'D' ], [ 'C' ] ]
-#+end_src
-
 ** Circular dependencies
-#+name: example-6
+#+name: circular
 #+begin_src js
   [
     ['A', ['B']],
@@ -174,23 +195,23 @@ Produces:
   ]
 #+end_src
 
-#+name: run-example-6
+#+name: run-circular
 #+begin_src js :noweb yes :results output :exports results :wrap src js
   const entries =
-  <<example-6>>
+  <<circular>>
   <<test>>
-  tlog([]);
+  asaplog([]);
 #+end_src
 
-Circular dependencies produce no results
+Circular dependencies produce no results:
 
-#+RESULTS: run-example-6
+#+RESULTS: run-circular
 #+begin_src js
 []
 #+end_src
 
 ** Complex
-#+name: example-4
+#+name: complex
 #+begin_src js
   [
     ['A', []],
@@ -207,12 +228,39 @@ Circular dependencies produce no results
   ]
 #+end_src
 
-#+name: run-example-4
+=asap= produces:
+
+#+name: run-complex-asap
 #+begin_src js :noweb yes :results output :exports results :wrap src js
     const entries =
-    <<example-4>>
+    <<complex>>
     <<test>>
-    tlog([
+    asaplog([
+      [ 'A', 'E', 'K' ],
+      [ 'B', 'H', 'I', 'J' ],
+      [ 'D', 'G' ],
+      [ 'C', 'F' ]
+    ]);
+#+end_src
+
+#+RESULTS: run-complex-asap
+#+begin_src js
+[
+  [ 'A', 'E', 'K' ],
+  [ 'B', 'H', 'I', 'J' ],
+  [ 'D', 'G' ],
+  [ 'C', 'F' ]
+]
+#+end_src
+
+while =alap= produces:
+
+#+name: run-complex-alap
+#+begin_src js :noweb yes :results output :exports results :wrap src js
+    const entries =
+    <<complex>>
+    <<test>>
+    alaplog([
       [ 'A', 'K' ],
       [ 'B', 'E', 'H', 'I', 'J' ],
       [ 'D', 'G' ],
@@ -220,9 +268,7 @@ Circular dependencies produce no results
     ]);
 #+end_src
 
-Produces:
-
-#+RESULTS: run-example-4
+#+RESULTS: run-complex-alap
 #+begin_src js
 [
   [ 'A', 'K' ],
@@ -232,22 +278,65 @@ Produces:
 ]
 #+end_src
 
-* Code
-#+name: layeredTopologicalSort
+* JavaScript Implementation
+** Types
+#+name: types
 #+begin_src js
-  /** @typedef {[string, string[]]} Entry */
-
   /**
-   ,* LayeredTopologicalSort returns a list of layers of entries, the entries
-   ,* within each layer can be executed in parallel.
+   ,* @typedef {string} Task
+   ,* @typedef {Task[]} Deps
+   ,* @typedef {[Task, Deps]} Entry
+   ,* @typedef {Entry[]} Entries
+   ,* @typedef {Array<Array<Task>>} Layers
+   ,* @typedef {{[task: string]: {[task: string]: boolean}}} Dependencies
+   ,*/
+#+end_src
+
+** ALAP
+#+name: alap
+#+begin_src js
+  /**
+   ,* Returns a list of layers of task sorted as late as possible,
+   ,* the tasks within each layer can be executed in parallel.
+   ,*
+   ,* @arg {Entries} entries
+   ,* @return {Layers}
+   ,*/
+  function alap(entries) {
+    const dependencies = buildGraph(entries);
+    const layers = layeredTopologicalSort(dependencies[1], dependencies[0]);
+    layers.reverse();
+    return layers;
+  }
+#+end_src
+
+** ASAP
+#+name: asap
+#+begin_src js
+  /**
+   ,* Returns a list of layers of task sorted as soon as possible,
+   ,* the tasks within each layer can be executed in parallel.
    ,*
    ,* @arg {Entry[]} entries
-   ,* @return {string[][]}
+   ,* @return {Layers}
    ,*/
-  function layeredTopologicalSort(entries) {
-    /** @type {{entryId: {dep: boolean}}} */
+  function asap(entries) {
+    const dependencies = buildGraph(entries);
+    return layeredTopologicalSort(dependencies[0], dependencies[1]);
+  }
+#+end_src
+
+** Build graph
+#+name: buildGraph
+#+begin_src js
+  /**
+   ,* @arg {Entry[]} entries
+   ,* @return {[Dependencies, Dependencies]}
+   ,*/
+  function buildGraph(entries) {
+    /** @type {Dependencies} */
     const dependenciesToFrom = Object.create(null);
-    /** @type {{dep: {entryId: boolean}}} */
+    /** @type {Dependencies} */
     const dependenciesFromTo = Object.create(null);
 
     // Build the dependencies graph
@@ -262,16 +351,31 @@ Produces:
         dependenciesFromTo[entryDep][entryId] = true;
       }
     }
+    return [dependenciesToFrom, dependenciesFromTo];
+  }
+#+end_src
 
-    /** @type {string[][]} */
+** Layered topological sort
+#+name: layeredTopologicalSort
+#+begin_src js
+  /**
+   ,* LayeredTopologicalSort returns a list of layers of entries,
+   ,* the entries within each layer can be executed in parallel.
+   ,*
+   ,* @arg {Dependencies} dependenciesToFrom
+   ,* @arg {Dependencies} dependenciesFromTo
+   ,* @return {Layers}
+   ,*/
+  function layeredTopologicalSort(dependenciesToFrom, dependenciesFromTo) {
+    /** @type {Layers} */
     const layers = [];
 
-    while (0 < Object.keys(dependenciesFromTo).length) {
+    while (0 < Object.keys(dependenciesToFrom).length) {
       /** @type {string[]} */
       const thisIterationIds = [];
 
-      for (const k in dependenciesFromTo) {
-        const v = dependenciesFromTo[k];
+      for (const k in dependenciesToFrom) {
+        const v = dependenciesToFrom[k];
 
         // If an item has zero dependencies, remove it
         if (Object.keys(v).length === 0) thisIterationIds.push(k);
@@ -287,54 +391,49 @@ Produces:
         layer.push(id);
 
         // Remove the found items from the dictionary
-        delete dependenciesFromTo[id];
+        delete dependenciesToFrom[id];
 
         // Remove all outbound edges
-        if (dependenciesToFrom[id]) {
-          for (const dep in dependenciesToFrom[id]) {
-            delete dependenciesFromTo[dep][id];
+        if (dependenciesFromTo[id]) {
+          for (const dep in dependenciesFromTo[id]) {
+            delete dependenciesToFrom[dep][id];
           }
         }
       }
       layers.push(layer);
     }
-    layers.reverse();
     return layers;
   }
 #+end_src
 
-#+name: extra
-#+begin_src js
-  /**
-   ,* Returns false if there are no cycles in the dependency graph.
-   ,*
-   ,* @arg {Entry[]} entries
-   ,* @ret {boolean}
-   ,*/
-  function hasCircularDependency(entries) {
-    return layeredTopologicalSort(entries).length < 1;
-  }
+#+name: main
+#+begin_src js :noweb yes :exports none
+  <<layeredTopologicalSort>>
+
+  <<buildGraph>>
+
+  <<asap>>
+
+  <<alap>>
 #+end_src
 
 #+begin_src js :noweb yes :tangle layeredTopologicalSort.js :exports none
-  <<layeredTopologicalSort>>
-  <<extra>>
-  export {
-    layeredTopologicalSort,
-    hasCircularDependency,
-  };
+  <<types>>
+
+  <<main>>
+
+  export { alap, asap };
 #+end_src
 
 #+name: test
 #+begin_src js :noweb yes :exports none
-  ; <<layeredTopologicalSort>>
-  function tlog(expected) {
-    const result = layeredTopologicalSort(entries);
-    console.log(result);
+  ; <<main>>
+  function asaplog(expected) { log(asap(entries), expected); }
+  function alaplog(expected) { log(alap(entries), expected); }
+  function log(result, expected) {
     const res = JSON.stringify(result);
     const exp = JSON.stringify(expected);
-    if (res !== exp) {
-      throw `Result does not match expected: ${res} !== ${exp}`;
-    };
+    const out = res === exp ? result : `Result does not match expected: ${res} !== ${exp}`;
+    console.log(out);
   }
 #+end_src

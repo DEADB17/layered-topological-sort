@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 242 82" width="242" height="82">
+  <style>
+    rect { fill:#fff; stroke:#000; stroke-width:2px; }
+    text { font-family:sans-serif; font-size:24px; }
+  </style>
+  <rect x="162" y="42" width="40" height="40"/>
+  <text x="173" y="71">D</text>
+  <rect x="42" y="42" width="120" height="40"/>
+  <text x="93" y="71">C</text>
+  <rect x="42" y="2" width="80" height="40"/>
+  <text x="74" y="31">B</text>
+  <rect x="2" y="42" width="40" height="40"/>
+  <text x="14" y="71">A</text>
+</svg>
