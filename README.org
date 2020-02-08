@@ -417,7 +417,7 @@ while =alap= produces:
   <<alap>>
 #+end_src
 
-#+begin_src js :noweb yes :tangle layeredTopologicalSort.js :exports none
+#+begin_src js :noweb yes :tangle layered-topological-sort.js :exports none
   <<types>>
 
   <<main>>
