@@ -38,41 +38,36 @@ execution (as ~B~ and ~C~ can be executed in parallel after ~A~ completes):
 | Layer 2 | B, C |
 | Layer 3 | D    |
 
-** JavaScript representation
+** JavaScript representation and API
 - A *Task* is represented by a string.
-- An *Entry* is a two element array:
-  1. A *Task*.
-  2. An array of tasks representing the *Dependencies*.
-- Entries are grouped into an array.
+- *Dependencies* is an array of tasks.
+- *Entries* is a map of dependencies keyed by a task.
+- A *Layer* is an array of tasks.
+- *Layers* is an array of layers.
+- =asap(entries)= Returns layers, where the dependencies are ordered to run as
+  soon as possible.
+- =alap(entries)= Returns layers, where the dependencies are ordered to run as
+  late as possible.
+
 #+name: intro-example
 #+begin_src js
-  [
-    ['A', []],
-    ['B', ['A']],
-    ['C', ['A']],
-    ['D', ['B', 'C']],
-  ]
-#+end_src
-
-Running
-#+begin_src js
-  asap([
-    ['A', []],
-    ['B', ['A']],
-    ['C', ['A']],
-    ['D', ['B', 'C']],
-  ]);
+  const entries = {
+    A: [],
+    B: ['A'],
+    C: ['A'],
+    D: ['B', 'C'],
+  }
 #+end_src
 
 #+name: run-intro-example
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
   <<intro-example>>
   <<test>>
-  asaplog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ])
+  bothlog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ])
 #+end_src
 
-Produces an array of layers, where each layer is an array of tasks.
+Running either =asap(entries)= or =alap(entries)= produces an array of layers,
+where each layer is an array of tasks.
 
 #+RESULTS: run-intro-example
 #+begin_src js
@@ -86,42 +81,40 @@ produce a shorter schedule.
 
 #+name: asap-alap-example
 #+begin_src js
-  [
-    ['A', []],
-    ['B', []],
-    ['C', ['A']],
-    ['D', ['B', 'C']],
-  ]
-#+end_src
-
-#+name: run-alap-example
-#+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
-  <<asap-alap-example>>
-  <<test>>
-  alaplog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]);
-#+end_src
-
-=alap= produces:
-
-#+RESULTS: run-alap-example
-#+begin_src js
-[ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]
+  const entries = {
+    A: [],
+    B: [],
+    C: ['A'],
+    D: ['B', 'C'],
+  }
 #+end_src
 
 #+name: run-asap-example
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
   <<asap-alap-example>>
   <<test>>
   asaplog([ [ 'A', 'B' ], [ 'C' ], [ 'D' ] ]);
 #+end_src
 
-=asap= produces:
+Running =asap(entries)= produces:
 
 #+RESULTS: run-asap-example
 #+begin_src js
 [ [ 'A', 'B' ], [ 'C' ], [ 'D' ] ]
+#+end_src
+
+#+name: run-alap-example
+#+begin_src js :noweb yes :results output :exports results :wrap src js
+  <<asap-alap-example>>
+  <<test>>
+  alaplog([ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]);
+#+end_src
+
+While running =alap(entries)= produces:
+
+#+RESULTS: run-alap-example
+#+begin_src js
+[ [ 'A' ], [ 'B', 'C' ], [ 'D' ] ]
 #+end_src
 
 *** =alap= is better than =asap=
@@ -138,23 +131,23 @@ alap [[./images/alap-lose.svg]]
 ** No dependencies
 #+name: no-deps
 #+begin_src js
-  [
-    ['A', []],
-    ['B', []],
-    ['C', []],
-    ['D', []],
-  ]
+  const entries = {
+    A: [],
+    B: [],
+    C: [],
+    D: [],
+  }
 #+end_src
 
 #+name: run-no-deps
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
   <<no-deps>>
   <<test>>
-  asaplog([ [ 'A', 'B', 'C', 'D' ] ]);
+  bothlog([ [ 'A', 'B', 'C', 'D' ] ]);
 #+end_src
 
-Both =asap= and =alap= produce a single layer, since all tasks are independent:
+Both =asap(entries)= and =alap(entries)= produce a single layer, since all tasks
+are independent:
 
 #+RESULTS: run-no-deps
 #+begin_src js
@@ -163,24 +156,23 @@ Both =asap= and =alap= produce a single layer, since all tasks are independent:
 ** Interdependent
 #+name: inter-dep
 #+begin_src js
-  [
-    ['A', []],
-    ['B', ['A']],
-    ['C', ['B']],
-    ['D', ['C']],
-  ]
+  const entries = {
+    A: [],
+    B: ['A'],
+    C: ['B'],
+    D: ['C'],
+  }
 #+end_src
 
 #+name: run-inter-dep
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
   <<inter-dep>>
   <<test>>
-  asaplog([ [ 'A' ], [ 'B' ], [ 'C' ], [ 'D' ] ]);
+  bothlog([ [ 'A' ], [ 'B' ], [ 'C' ], [ 'D' ] ]);
 #+end_src
 
-Both =asap= and =alap= produce one layer per task since they are interdependent
-and can't run in parallel:
+Both =asap(entries)= and =alap(entries)= produce one layer per task since they
+are interdependent and can't run in parallel:
 
 #+RESULTS: run-inter-dep
 #+begin_src js
@@ -189,21 +181,21 @@ and can't run in parallel:
 ** Circular dependencies
 #+name: circular
 #+begin_src js
-  [
-    ['A', ['B']],
-    ['B', ['A']],
-  ]
+  const entries = {
+    A: ['B'],
+    B: ['A'],
+  }
 #+end_src
 
 #+name: run-circular
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-  const entries =
   <<circular>>
   <<test>>
-  asaplog([]);
+  bothlog([]);
 #+end_src
 
-Circular dependencies produce no results:
+Circular dependencies produce no results.\\
+Running =asap(entries)= or =alap(entries)= produces an empty layers array.
 
 #+RESULTS: run-circular
 #+begin_src js
@@ -213,26 +205,25 @@ Circular dependencies produce no results:
 ** Complex
 #+name: complex
 #+begin_src js
-  [
-    ['A', []],
-    ['B', ['A']],
-    ['C', ['A', 'D']],
-    ['D', ['E', 'B']],
-    ['E', []],
-    ['F', ['A', 'D', 'G']],
-    ['G', ['H', 'I', 'J']],
-    ['H', ['K']],
-    ['I', ['K']],
-    ['J', ['K']],
-    ['K', []],
-  ]
+  const entries = {
+    A: [],
+    B: ['A'],
+    C: ['A', 'D'],
+    D: ['E', 'B'],
+    E: [],
+    F: ['A', 'D', 'G'],
+    G: ['H', 'I', 'J'],
+    H: ['K'],
+    I: ['K'],
+    J: ['K'],
+    K: [],
+  }
 #+end_src
 
-=asap= produces:
+=asap(entries)= produces:
 
 #+name: run-complex-asap
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-    const entries =
     <<complex>>
     <<test>>
     asaplog([
@@ -253,16 +244,15 @@ Circular dependencies produce no results:
 ]
 #+end_src
 
-while =alap= produces:
+while =alap(entries)= produces:
 
 #+name: run-complex-alap
 #+begin_src js :noweb yes :results output :exports results :wrap src js
-    const entries =
     <<complex>>
     <<test>>
     alaplog([
       [ 'A', 'K' ],
-      [ 'B', 'E', 'H', 'I', 'J' ],
+      [ 'B', 'E', 'J', 'I', 'H' ],
       [ 'D', 'G' ],
       [ 'C', 'F' ]
     ]);
@@ -272,7 +262,7 @@ while =alap= produces:
 #+begin_src js
 [
   [ 'A', 'K' ],
-  [ 'B', 'E', 'H', 'I', 'J' ],
+  [ 'B', 'E', 'J', 'I', 'H' ],
   [ 'D', 'G' ],
   [ 'C', 'F' ]
 ]
@@ -284,11 +274,11 @@ while =alap= produces:
 #+begin_src js
   /**
    ,* @typedef {string} Task
-   ,* @typedef {Task[]} Deps
-   ,* @typedef {[Task, Deps]} Entry
-   ,* @typedef {Entry[]} Entries
-   ,* @typedef {Array<Array<Task>>} Layers
-   ,* @typedef {{[task: string]: {[task: string]: boolean}}} Dependencies
+   ,* @typedef {Task[]} Dependencies
+   ,* @typedef {{[task: string]: Dependencies}} Entries
+   ,* @typedef {Task[]} Layer
+   ,* @typedef {Layer[]} Layers
+   ,* @typedef {{[task: string]: {[task: string]: boolean}}} DGraph
    ,*/
 #+end_src
 
@@ -303,7 +293,7 @@ while =alap= produces:
    ,* @return {Layers}
    ,*/
   function alap(entries) {
-    const dependencies = buildGraph(entries);
+    const dependencies = createGraphs(entries);
     const layers = layeredTopologicalSort(dependencies[1], dependencies[0]);
     layers.reverse();
     return layers;
@@ -317,41 +307,41 @@ while =alap= produces:
    ,* Returns a list of layers of task sorted as soon as possible,
    ,* the tasks within each layer can be executed in parallel.
    ,*
-   ,* @arg {Entry[]} entries
+   ,* @arg {Entries} entries
    ,* @return {Layers}
    ,*/
   function asap(entries) {
-    const dependencies = buildGraph(entries);
+    const dependencies = createGraphs(entries);
     return layeredTopologicalSort(dependencies[0], dependencies[1]);
   }
 #+end_src
 
-** Build graph
-#+name: buildGraph
+** Create graphs
+#+name: createGraphs
 #+begin_src js
   /**
-   ,* @arg {Entry[]} entries
-   ,* @return {[Dependencies, Dependencies]}
+   ,* @arg {Entries} entries
+   ,* @return {[DGraph, DGraph]}
    ,*/
-  function buildGraph(entries) {
-    /** @type {Dependencies} */
-    const dependenciesToFrom = Object.create(null);
-    /** @type {Dependencies} */
-    const dependenciesFromTo = Object.create(null);
+  function createGraphs(entries) {
+    /** @type {DGraph} */
+    const toFrom = {};
+    /** @type {DGraph} */
+    const fromTo = {};
 
     // Build the dependencies graph
-    for (const entry of entries) {
-      const entryId = entry[0];
-      dependenciesToFrom[entryId] = Object.create(null);
-      if (!dependenciesFromTo[entryId]) dependenciesFromTo[entryId] = Object.create(null);
-      const entryDeps = entry[1];
-      for (const entryDep of entryDeps) {
-        dependenciesToFrom[entryId][entryDep] = true;
-        if (!dependenciesFromTo[entryDep]) dependenciesFromTo[entryDep] = Object.create(null);
-        dependenciesFromTo[entryDep][entryId] = true;
+    for (const task in entries) {
+      toFrom[task] = {};
+      if (!fromTo[task]) fromTo[task] = {};
+      const deps = entries[task];
+      for (let n = deps.length - 1; 0 <= n; n -= 1) {
+        const dep = deps[n];
+        toFrom[task][dep] = true;
+        if (!fromTo[dep]) fromTo[dep] = {};
+        fromTo[dep][task] = true;
       }
     }
-    return [dependenciesToFrom, dependenciesFromTo];
+    return [toFrom, fromTo];
   }
 #+end_src
 
@@ -362,20 +352,20 @@ while =alap= produces:
    ,* LayeredTopologicalSort returns a list of layers of entries,
    ,* the entries within each layer can be executed in parallel.
    ,*
-   ,* @arg {Dependencies} dependenciesToFrom
-   ,* @arg {Dependencies} dependenciesFromTo
+   ,* @arg {DGraph} toFrom
+   ,* @arg {DGraph} fromTo
    ,* @return {Layers}
    ,*/
-  function layeredTopologicalSort(dependenciesToFrom, dependenciesFromTo) {
+  function layeredTopologicalSort(toFrom, fromTo) {
     /** @type {Layers} */
     const layers = [];
 
-    while (0 < Object.keys(dependenciesToFrom).length) {
+    while (0 < Object.keys(toFrom).length) {
       /** @type {string[]} */
       const thisIterationIds = [];
 
-      for (const k in dependenciesToFrom) {
-        const v = dependenciesToFrom[k];
+      for (const k in toFrom) {
+        const v = toFrom[k];
 
         // If an item has zero dependencies, remove it
         if (Object.keys(v).length === 0) thisIterationIds.push(k);
@@ -384,19 +374,20 @@ while =alap= produces:
       // if nothing was found to remove, there's no valid sort
       if (thisIterationIds.length === 0) return [];
 
-      /** @type {string[]} */
+      /** @type {Layer} */
       const layer = [];
-      for (const id of thisIterationIds) {
+      for (let i = 0, n = thisIterationIds.length; i < n; i++) {
+        const id = thisIterationIds[i];
         // Add them to the overall ordering
         layer.push(id);
 
         // Remove the found items from the dictionary
-        delete dependenciesToFrom[id];
+        delete toFrom[id];
 
         // Remove all outbound edges
-        if (dependenciesFromTo[id]) {
-          for (const dep in dependenciesFromTo[id]) {
-            delete dependenciesToFrom[dep][id];
+        if (fromTo[id]) {
+          for (const dep in fromTo[id]) {
+            delete toFrom[dep][id];
           }
         }
       }
@@ -410,7 +401,7 @@ while =alap= produces:
 #+begin_src js :noweb yes :exports none
   <<layeredTopologicalSort>>
 
-  <<buildGraph>>
+  <<createGraphs>>
 
   <<asap>>
 
@@ -428,12 +419,13 @@ while =alap= produces:
 #+name: test
 #+begin_src js :noweb yes :exports none
   ; <<main>>
-  function asaplog(expected) { log(asap(entries), expected); }
-  function alaplog(expected) { log(alap(entries), expected); }
-  function log(result, expected) {
-    const res = JSON.stringify(result);
-    const exp = JSON.stringify(expected);
-    const out = res === exp ? result : `Result does not match expected: ${res} !== ${exp}`;
-    console.log(out);
+  ; const dse = require('assert').deepStrictEqual;
+  function asaplog(expected) { dse(asap(entries), expected); console.log(expected); }
+  function alaplog(expected) { dse(alap(entries), expected); console.log(expected); }
+  function bothlog(expected) {
+    const soon = asap(entries);
+    dse(soon, alap(entries));
+    dse(soon, expected);
+    console.log(expected);
   }
 #+end_src
